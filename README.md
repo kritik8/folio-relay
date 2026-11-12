@@ -75,3 +75,4 @@ The benchmark writes:
 - The embedded corpus is deterministic and works without external network access.
 - Real Groq requests are used when the key is present and the API is reachable.
 - The fallback stand-in enforces queueing, rate limits, and budget exhaustion behavior so the benchmark remains reproducible.
+- Simulating `daily_budget_exhausted` returns the verified fallback badge and two cited reranked excerpts without making a model call.

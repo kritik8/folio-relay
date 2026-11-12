@@ -159,8 +159,28 @@ func runServer(port int) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		response := map[string]any{"scenario": req.Scenario, "count": req.Count, "status": status}
+		if req.Scenario == "daily_budget_exhausted" {
+			passages := library.RetrieveArxivPassages("What is Moshi's theoretical latency?", library.ParseRetrievalSetting("Setting B"))
+			if len(passages) < 2 {
+				http.Error(w, "daily-budget fallback requires two retrieved passages", http.StatusInternalServerError)
+				return
+			}
+			excerpts := make([]map[string]string, 0, 2)
+			for _, passage := range passages[:2] {
+				excerpts = append(excerpts, map[string]string{
+					"citation": fmt.Sprintf("[%s, %s, Page %s]", passage.PaperID, passage.Section, passage.Page),
+					"text":     passage.Text,
+				})
+			}
+			response["fallback"] = map[string]any{
+				"mode":     "Deterministic Extractive Mode",
+				"banner":   "[DAILY MODEL BUDGET EXHAUSTED — VERIFIED EXTRACTIVE FALLBACK]",
+				"excerpts": excerpts,
+			}
+		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = jsonEncode(w, map[string]any{"scenario": req.Scenario, "count": req.Count, "status": status})
+		_ = jsonEncode(w, response)
 	})
 
 	srv := &http.Server{

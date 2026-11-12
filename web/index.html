@@ -172,6 +172,8 @@
     .answer-panel[hidden] { display: none; }
     .answer-panel p { margin: 7px 0 0; font: 400 17px/1.6 "Playfair Display", serif; white-space: pre-wrap; }
     .answer-status { color: var(--text-muted); font-size: 10px; }
+    .fallback-excerpt { border-top: 1px solid var(--border-hairline); margin-top: 14px; padding-top: 12px; }
+    .fallback-excerpt .paper-meta { border: 0; padding: 0; }
     .simulation-row { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 20px; }
     .simulation-note { align-self: center; color: var(--text-muted); font-size: 11px; }
 
@@ -351,6 +353,10 @@
           <article class="answer-panel" id="answerPanel" hidden>
             <span class="answer-status" id="answerStatus"></span>
             <p id="answerText"></p>
+          </article>
+          <article class="answer-panel" id="fallbackPanel" hidden aria-live="polite">
+            <span class="answer-status" id="fallbackStatus"></span>
+            <div id="fallbackExcerpts"></div>
           </article>
           <div class="simulation-row">
             <button class="button secondary" type="button" data-scenario="rpm_limit_halved">Simulate rate limit spike</button>
@@ -532,6 +538,7 @@
       event.preventDefault();
       const button = document.getElementById('askButton');
       const panel = document.getElementById('answerPanel');
+      document.getElementById('fallbackPanel').hidden = true;
       const steps = [...document.querySelectorAll('.trace-step')];
       button.disabled = true;
       button.textContent = 'Following the relay…';
@@ -573,6 +580,23 @@
           const result = await response.json();
           if (!response.ok) throw new Error(result.error || `Simulation returned ${response.status}`);
           status.textContent = `${result.status.accepted} accepted · ${result.status.rate_limited} rate-limited · ${result.status.timeouts} timeouts`;
+          const fallbackPanel = document.getElementById('fallbackPanel');
+          fallbackPanel.hidden = !result.fallback;
+          if (result.fallback) {
+            document.getElementById('fallbackStatus').textContent = result.fallback.banner;
+            document.getElementById('fallbackExcerpts').replaceChildren(...result.fallback.excerpts.map(excerpt => {
+              const section = document.createElement('section');
+              section.className = 'fallback-excerpt';
+              const citation = document.createElement('div');
+              citation.className = 'paper-meta';
+              citation.textContent = excerpt.citation;
+              const text = document.createElement('p');
+              text.textContent = excerpt.text;
+              section.append(citation, text);
+              return section;
+            }));
+            status.textContent += ' · Deterministic Extractive Mode (no model call)';
+          }
           await loadMetrics();
         } catch (error) {
           status.textContent = error.message;

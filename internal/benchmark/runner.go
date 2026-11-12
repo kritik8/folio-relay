@@ -776,7 +776,7 @@ The intended policy is at most one retry for idempotent retrieval or synthesis, 
 
 ## 7 What the person sees
 
-At 3:00 PM after the daily model budget is exhausted, the interface should not surface a raw provider 429 or invent an answer. Its response is badged “[DAILY MODEL BUDGET EXHAUSTED — VERIFIED EXTRACTIVE FALLBACK]” and includes the top two reranked verbatim passages with exact [arXiv ID, Section, Page] citations. The fallback uses no model call. The current HTTP query path returns a grounded local extract or refusal; this exact budget banner and two-card response remain a production UI integration task, not a behavior claimed by the benchmark.
+At 3:00 PM after the daily model budget is exhausted, the interface should not surface a raw provider 429 or invent an answer. Its response is badged “[DAILY MODEL BUDGET EXHAUSTED — VERIFIED EXTRACTIVE FALLBACK]” and includes the top two reranked verbatim passages with exact [arXiv ID, Section, Page] citations. The daily-budget simulation now renders those cards without a model call. It is a deterministic UI/API simulation, not evidence that a live provider's daily quota was exhausted or a production circuit breaker.
 
 ## 8 What I'm unsure about, what I left out, what I learned
 
