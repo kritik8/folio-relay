@@ -1,0 +1,14 @@
+{
+  "model": "openai/gpt-oss-20b",
+  "headers": {
+    "x-ratelimit-limit-requests": "1000",
+    "x-ratelimit-limit-tokens": "8000",
+    "x-ratelimit-remaining-requests": "915",
+    "x-ratelimit-remaining-tokens": "7723",
+    "x-ratelimit-reset-requests": "2h2m24s",
+    "x-ratelimit-reset-tokens": "2.077s"
+  },
+  "steady_requests": 15,
+  "burst_requests": 5,
+  "burst_429": 0
+}
