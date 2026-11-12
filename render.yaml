@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: folio-relay
+    runtime: go
+    plan: free
+    buildCommand: go build -tags netgo -ldflags '-s -w' -o app .
+    startCommand: ./app --mode=server
+    envVars:
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        value: openai/gpt-oss-20b

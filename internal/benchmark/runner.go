@@ -1010,9 +1010,9 @@ func limitTableRows(evidence RateLimitEvidence) string {
 		resetTokens = "not observed"
 	}
 	observed429 := fmt.Sprintf("%d of %d real burst probes", evidence.Burst429, evidence.BurstRequests)
-	recovery := "not measured"
+	recovery := "post-429 recovery not measured"
 	if resetTokens != "not observed" || resetRequests != "not observed" {
-		recovery = fmt.Sprintf("header reset tokens=%s, requests=%s; post-429 recovery %s", resetTokens, resetRequests, recovery)
+		recovery = fmt.Sprintf("observed x-ratelimit-reset tokens=%s, requests=%s; post-429 recovery not measured", resetTokens, resetRequests)
 	}
 	retry := retryAfter
 	if retry == "" {
@@ -1029,7 +1029,7 @@ func limitTableRows(evidence RateLimitEvidence) string {
 	fmt.Fprintf(&out, "| Tokens per day | 500,000 TPD (or 100,000 TPD on 70B) | Free-tier reference; remaining-tokens observed %s is a window counter, not a daily total | medium |\n", remainingTokens)
 	out.WriteString("| Requests in flight at once | ~6 concurrent before queueing knee (assignment hypothesis; not provider-measured) | Stand-in concurrency fixture; the five-call real burst does not establish a provider knee | medium |\n")
 	fmt.Fprintf(&out, "| What it returns when a limit is hit | HTTP 429 JSON error (rate_limit_exceeded) + retry-after header | API error contract; real burst probe: %s returned 429; retry-after: %s | high |\n", observed429, retry)
-	fmt.Fprintf(&out, "| Time until it recovers | 2.0s–12.5s reference for TPM/RPM window reset (not measured in this run) | x-ratelimit reset headers: tokens=%s, requests=%s; cooldown to HTTP 200: %s | high |\n", resetTokens, resetRequests, recovery)
+	fmt.Fprintf(&out, "| Time until it recovers | %s; the 2.0s–12.5s reference was not verified by a cooldown probe | x-ratelimit-reset-* headers captured on real responses | high |\n", recovery)
 	return out.String()
 }
 

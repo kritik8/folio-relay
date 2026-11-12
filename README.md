@@ -25,6 +25,16 @@ Then open:
 - `http://localhost:8080`
 - `http://localhost:8080/api/metrics`
 
+## Deploy to Render
+
+The repo ships with `render.yaml`, so Render can create the service directly from the GitHub repository.
+
+1. In Render, choose **New > Blueprint** and connect this repository.
+2. Set `GROQ_API_KEY` when prompted; it is marked `sync: false` and is never stored in the blueprint.
+3. Apply the blueprint. Render builds `./app` with `go build -tags netgo -ldflags '-s -w' -o app .` and runs `./app --mode=server`.
+
+`GROQ_MODEL` defaults to `openai/gpt-oss-20b` in the blueprint. Render injects `PORT` automatically and `main.go` reads it, so no port change is needed. The free plan sleeps after inactivity, so the first request after a sleep is slower.
+
 ## Environment
 
 Copy the example file and set your real key if needed. The application loads `.env` at startup without overriding variables already set in the process environment.
@@ -35,7 +45,7 @@ cp .env.example .env
 
 ```dotenv
 GROQ_API_KEY=your_key_here
-GROQ_MODEL=llama-3.1-8b-instant
+GROQ_MODEL=openai/gpt-oss-20b
 PORT=8080
 ```
 

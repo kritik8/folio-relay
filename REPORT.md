@@ -26,7 +26,7 @@ Every numeric table cell is regenerated from results.csv, with captured provider
 | Tokens per day | 500,000 TPD (or 100,000 TPD on 70B) | Free-tier reference; remaining-tokens observed 1670 is a window counter, not a daily total | medium |
 | Requests in flight at once | ~6 concurrent before queueing knee (assignment hypothesis; not provider-measured) | Stand-in concurrency fixture; the five-call real burst does not establish a provider knee | medium |
 | What it returns when a limit is hit | HTTP 429 JSON error (rate_limit_exceeded) + retry-after header | API error contract; real burst probe: 0 of 5 real burst probes returned 429; retry-after: header not observed | high |
-| Time until it recovers | 2.0s–12.5s reference for TPM/RPM window reset (not measured in this run) | x-ratelimit reset headers: tokens=47.475s, requests=2h28m19.199s; cooldown to HTTP 200: header reset tokens=47.475s, requests=2h28m19.199s; post-429 recovery not measured | high |
+| Time until it recovers | observed x-ratelimit-reset tokens=47.475s, requests=2h28m19.199s; post-429 recovery not measured; the 2.0s–12.5s reference was not verified by a cooldown probe | x-ratelimit-reset-* headers captured on real responses | high |
 
 
 ### Table 2a: Latency, one row per load scenario
