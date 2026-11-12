@@ -3,15 +3,21 @@ package pipeline
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/kritik8/folio-relay/internal/library"
 	"github.com/kritik8/folio-relay/internal/llm"
 )
 
 type Trace struct {
-	WaitingMS  int
-	WorkingMS  int
-	RetryingMS int
+	WaitingMS    int
+	WorkingMS    int
+	RetryingMS   int
+	RetrievalMS  int
+	SynthesisMS  int
+	FirstTokenMS int
+	GenerationMS int
+	TotalMS      int
 }
 
 type AnswerResult struct {
@@ -33,15 +39,13 @@ func queryRequestsOutsideLibrary(query string) bool {
 }
 
 func RunQuery(query string, setting library.RetrievalSetting, useReal bool) (AnswerResult, error) {
+	requestStarted := time.Now()
 	if setting.PieceSize <= 0 {
 		setting = library.DefaultSetting()
 	}
-	trace := Trace{WaitingMS: 120, WorkingMS: 240, RetryingMS: 0}
-	trace.WorkingMS += setting.PiecesFetched * 12
-	if setting.Rerank {
-		trace.WorkingMS += 40
-	}
+	trace := Trace{}
 	if queryRequestsOutsideLibrary(query) {
+		trace.TotalMS = int(time.Since(requestStarted).Milliseconds())
 		return AnswerResult{
 			Answer:    "The provided arXiv library does not contain information to answer this question.",
 			Citations: []string{"[No supporting passage in the fixed library]"},
@@ -49,8 +53,12 @@ func RunQuery(query string, setting library.RetrievalSetting, useReal bool) (Ans
 			Trace:     trace,
 		}, nil
 	}
+	retrievalStarted := time.Now()
 	passages := library.RetrieveArxivPassages(query, setting)
+	trace.RetrievalMS = int(time.Since(retrievalStarted).Milliseconds())
 	if len(passages) == 0 {
+		trace.WorkingMS = trace.RetrievalMS
+		trace.TotalMS = int(time.Since(requestStarted).Milliseconds())
 		return AnswerResult{
 			Answer:    "The provided arXiv library does not contain information to answer this question.",
 			Citations: []string{"[No evidence found]"},
@@ -63,24 +71,33 @@ func RunQuery(query string, setting library.RetrievalSetting, useReal bool) (Ans
 		evidence = append(evidence, fmt.Sprintf("[%s, %s, %s]", p.PaperID, p.Section, p.Page))
 	}
 
-	// Keep synthesis extractive so every returned claim stays inside retrieved evidence.
+	synthesisStarted := time.Now()
 	answerText := synthesizeAnswer(query, passages)
 	if strings.TrimSpace(answerText) == "" {
 		answerText = "The provided arXiv library contains evidence supporting a constrained answer, but the exact details are not directly stated in the retrieved passages."
 	}
+	trace.SynthesisMS = int(time.Since(synthesisStarted).Milliseconds())
 
-	// A modest model call is emulated with the stand-in, because the benchmark is deterministic and offline.
+	trace.WorkingMS = trace.RetrievalMS + trace.SynthesisMS
 	if useReal {
 		client := llm.NewClient()
 		if client.APIKey != "" {
-			req := llm.ChatRequest{Model: client.Model, Messages: []llm.ChatMessage{{Role: "user", Content: query}}, Stream: true}
+			context := make([]string, 0, len(passages))
+			for _, passage := range passages {
+				context = append(context, fmt.Sprintf("[%s, %s, Page %s] %s", passage.PaperID, passage.Section, passage.Page, passage.Text))
+			}
+			prompt := "Answer only from this evidence and cite each factual claim:\n" + strings.Join(context, "\n\n") + "\n\nQuestion: " + query
+			req := llm.ChatRequest{Model: client.Model, Messages: []llm.ChatMessage{{Role: "user", Content: prompt}}, Stream: true}
 			completion, err := client.ChatWithFallback(req)
 			if err != nil {
 				return AnswerResult{}, fmt.Errorf("Groq synthesis failed: %w", err)
 			}
+			trace.FirstTokenMS = completion.FirstTokenMS
+			trace.GenerationMS = completion.GenerationMS
 			trace.WorkingMS += completion.TotalMS
 		}
 	}
+	trace.TotalMS = int(time.Since(requestStarted).Milliseconds())
 	return AnswerResult{Answer: answerText, Citations: evidence[:min(len(evidence), 3)], Setting: setting, Trace: trace}, nil
 }
 

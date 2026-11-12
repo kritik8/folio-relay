@@ -49,6 +49,7 @@ type ChatCompletion struct {
 	FirstTokenMS   int
 	TotalMS        int
 	Attempts       int
+	GenerationMS   int
 }
 
 type Client struct {
@@ -173,6 +174,7 @@ func (c *Client) Chat(req ChatRequest) (*ChatCompletion, error) {
 	if req.Stream {
 		scanner := bufio.NewScanner(resp.Body)
 		scanner.Buffer(make([]byte, 4096), 1024*1024)
+		var firstTokenAt time.Time
 		for scanner.Scan() {
 			line := strings.TrimSpace(scanner.Text())
 			if !strings.HasPrefix(line, "data:") {
@@ -194,8 +196,8 @@ func (c *Client) Chat(req ChatRequest) (*ChatCompletion, error) {
 				return result, fmt.Errorf("decode Groq stream event: %w", err)
 			}
 			if len(event.Choices) > 0 && event.Choices[0].Delta.Content != "" {
-				if result.FirstTokenMS == 0 {
-					result.FirstTokenMS = int(time.Since(started).Milliseconds())
+				if firstTokenAt.IsZero() {
+					firstTokenAt = time.Now()
 				}
 				result.Content += event.Choices[0].Delta.Content
 			}
@@ -206,10 +208,15 @@ func (c *Client) Chat(req ChatRequest) (*ChatCompletion, error) {
 		if err := scanner.Err(); err != nil {
 			return result, fmt.Errorf("read Groq stream: %w", err)
 		}
-		result.TotalMS = int(time.Since(started).Milliseconds())
-		if result.FirstTokenMS == 0 {
-			result.FirstTokenMS = result.TotalMS
+		finished := time.Now()
+		if firstTokenAt.IsZero() {
+			result.TotalMS = int(finished.Sub(started).Milliseconds())
+			return result, nil
 		}
+		result.FirstTokenMS = int(firstTokenAt.Sub(started).Milliseconds())
+		generationDuration := finished.Sub(firstTokenAt)
+		result.GenerationMS = int((generationDuration + time.Millisecond - 1) / time.Millisecond)
+		result.TotalMS = result.FirstTokenMS + result.GenerationMS
 		return result, nil
 	}
 	body, readErr := io.ReadAll(resp.Body)

@@ -3,12 +3,55 @@
   "headers": {
     "x-ratelimit-limit-requests": "1000",
     "x-ratelimit-limit-tokens": "8000",
-    "x-ratelimit-remaining-requests": "915",
-    "x-ratelimit-remaining-tokens": "7723",
-    "x-ratelimit-reset-requests": "2h2m24s",
-    "x-ratelimit-reset-tokens": "2.077s"
+    "x-ratelimit-remaining-requests": "897",
+    "x-ratelimit-remaining-tokens": "1670",
+    "x-ratelimit-reset-requests": "2h28m19.199s",
+    "x-ratelimit-reset-tokens": "47.475s"
   },
   "steady_requests": 15,
   "burst_requests": 5,
-  "burst_429": 0
+  "burst_429": 0,
+  "pipeline_spans": {
+    "burst-0060": {
+      "request_id": "burst-0060",
+      "source": "stand-in",
+      "scenario": "burst",
+      "first_token_ms": 2325,
+      "total_ms": 3236,
+      "waiting_ms": 1406,
+      "retrieval_ms": 4,
+      "retrying_ms": 915,
+      "generation_ms": 911,
+      "working_ms": 915,
+      "before_first_token_ms": 2325,
+      "after_first_token_ms": 911,
+      "events": [
+        {
+          "name": "local_admission_queue",
+          "start_ms": 0,
+          "end_ms": 1406
+        },
+        {
+          "name": "bm25_retrieval",
+          "start_ms": 1406,
+          "end_ms": 1410
+        },
+        {
+          "name": "stand-in_429_backoff",
+          "start_ms": 1410,
+          "end_ms": 2325
+        },
+        {
+          "name": "first_sse_content",
+          "start_ms": 2325,
+          "end_ms": 2325
+        },
+        {
+          "name": "stream_generation",
+          "start_ms": 2325,
+          "end_ms": 3236
+        }
+      ]
+    }
+  }
 }

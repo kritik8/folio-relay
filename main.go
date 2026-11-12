@@ -111,9 +111,14 @@ func runServer(port int) {
 			"citations": result.Citations,
 			"setting":   result.Setting,
 			"trace": map[string]any{
-				"waiting_ms":  result.Trace.WaitingMS,
-				"working_ms":  result.Trace.WorkingMS,
-				"retrying_ms": result.Trace.RetryingMS,
+				"waiting_ms":     result.Trace.WaitingMS,
+				"working_ms":     result.Trace.WorkingMS,
+				"retrying_ms":    result.Trace.RetryingMS,
+				"retrieval_ms":   result.Trace.RetrievalMS,
+				"synthesis_ms":   result.Trace.SynthesisMS,
+				"first_token_ms": result.Trace.FirstTokenMS,
+				"generation_ms":  result.Trace.GenerationMS,
+				"total_ms":       result.Trace.TotalMS,
 			},
 		})
 	})

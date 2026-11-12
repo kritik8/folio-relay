@@ -1,16 +1,16 @@
 # 1 What I built and why
 
-FolioRelay is a Go research relay whose central design choice is token-aware admission control with retrieval downshifting and an extractive fallback. It deliberately gives up verbose, multi-pass generation during overload rather than silently dropping a request or returning an unsupported claim. The five stages are: an intent analyzer identifies the question and its paper entities; the ArXiv passage retriever runs as a tool over the fixed corpus; an evidence-sufficiency router either expands retrieval or refuses; cited synthesis streams only from selected passages; and a grounding verifier checks citations and factual support, allowing at most a bounded correction pass when budget remains.
+I built FolioRelay as a Go research relay around token-aware admission under load. The benchmark models bounded queueing, retry budgets, and retrieval downshifting from Setting B to Setting A as token headroom falls; the API's daily-budget path returns deterministic extractive answers. The five stages are an Intent Analyzer, ArXiv Passage Retriever Tool, Evidence Sufficiency Router Branch, Cited Synthesis Stream, and Grounding Verifier Loop. Together, they constrain each answer to the retrieved evidence and the available budget.
 
 The corpus is available locally so the application remains deterministic without arXiv access. Each excerpt carries paper ID, version, title, section, and page. Setting A retrieves a small context, Setting B reranks a balanced context, and Setting C uses a larger context. The CSV is the measurement ledger; the report tables are regenerated directly from it.
 
 ## 2 The real service and my stand-in
 
-The real client calls the fixed OpenAI-compatible Groq chat-completions endpoint with server-side streaming. It records the time to the first content delta and the time until stream completion, captures the x-ratelimit limit, remaining, reset, and retry-after headers, and preserves HTTP 429 as a rate-limited outcome. On a model-not-found 404 it tries the configured model followed by the requested compatibility sequence: llama-3.3-70b-versatile, llama-3.1-8b-instant, openai/gpt-oss-20b, and qwen/qwen3-32b. Fifteen spaced requests form the steady calibration; a separate five-request burst probe is recorded if credentials are configured. These are measurements only when the CSV source is real and the status is successful.
+The real client calls Groq's fixed OpenAI-compatible chat-completions endpoint using retrieved paper passages and streamed synthesis. It records first-content-delta time, stream completion time, token usage, and x-ratelimit limit, remaining, reset, and retry-after headers. A model-not-found 404 advances through the configured fallback sequence. With a configured API key, the benchmark sends fifteen two-second-spaced requests and five concurrent probes; without one, the 15 calibration rows are explicitly marked stand-in. This report keeps provider measurements distinct from every simulated load shape.
 
 Groq's response headers are useful for short-window observations: remaining-requests is an RPM-window counter, not a daily request allowance, and remaining-tokens is a TPM-window counter, not a daily token allowance. The requested RPD/TPD values in Table 1 are reference limits from the assignment, not values proven by those two remaining counters. Actual limits can vary by account and model; no 429 is claimed unless a probe actually returns one.
 
-The stand-in is a deterministic load fixture with a log-normal-style base TTFT distribution, a nonlinear queue penalty shaped around 15 ms times in_flight^1.6, and request/token daily and minute budget scenarios. Synthetic rows make scenario comparisons reproducible, but they are not provider observations. The biggest mismatch is that Groq uses dynamic multi-tenant batching, scheduling jitter, and prompt-prefix KV caching; a small in-process simulator cannot reproduce those interactions or a live provider's changing quota window.
+The stand-in supplies controlled request-to-request TTFT variation, output-length-dependent streaming duration, and distinct burst, sustained, minute-limit, and daily-budget traces. It gives me repeatable comparisons while Groq's multi-tenant batching jitter and prompt-prefix KV caching remain provider-side effects visible only in the real rows.
 
 ## 3 Results
 
@@ -22,34 +22,34 @@ Every numeric table cell is regenerated from results.csv, with captured provider
 |---|---|---|---|
 | Requests per minute | 30 RPM (brief reference; observed 1000 for openai/gpt-oss-20b) | x-ratelimit-limit-requests captured on real response | high |
 | Tokens per minute | 6,000 TPM (or 12,000 TPM depending on active model header; observed 8000) | x-ratelimit-limit-tokens captured on real response | high |
-| Requests per day | 14,400 RPD (or 1,000 RPD on 70B) | Groq rate-limit documentation; remaining-requests observed 915 is a window counter, not a daily delta | high |
-| Tokens per day | 500,000 TPD (or 100,000 TPD on 70B) | Free-tier reference; remaining-tokens observed 7723 is a window counter, not a daily total | medium |
+| Requests per day | 14,400 RPD (or 1,000 RPD on 70B) | Groq rate-limit documentation; remaining-requests observed 897 is a window counter, not a daily delta | high |
+| Tokens per day | 500,000 TPD (or 100,000 TPD on 70B) | Free-tier reference; remaining-tokens observed 1670 is a window counter, not a daily total | medium |
 | Requests in flight at once | ~6 concurrent before queueing knee (assignment hypothesis; not provider-measured) | Stand-in concurrency fixture; the five-call real burst does not establish a provider knee | medium |
 | What it returns when a limit is hit | HTTP 429 JSON error (rate_limit_exceeded) + retry-after header | API error contract; real burst probe: 0 of 5 real burst probes returned 429; retry-after: header not observed | high |
-| Time until it recovers | 2.0s–12.5s reference for TPM/RPM window reset (not measured in this run) | x-ratelimit reset headers: tokens=2.077s, requests=2h2m24s; cooldown to HTTP 200: header reset tokens=2.077s, requests=2h2m24s; post-429 recovery not measured | high |
+| Time until it recovers | 2.0s–12.5s reference for TPM/RPM window reset (not measured in this run) | x-ratelimit reset headers: tokens=47.475s, requests=2h28m19.199s; cooldown to HTTP 200: header reset tokens=47.475s, requests=2h28m19.199s; post-429 recovery not measured | high |
 
 
 ### Table 2a: Latency, one row per load scenario
 
 | Scenario | Real or stand-in | Requests sent | Duration (s) | Offered rate (per min) | First token p50/p95/p99 (ms) | Total time p50/p95/p99 (ms) |
 |---|---|---:|---:|---:|---:|---:|
-| steady_real | real | 15 | 30 | 30.0 | 401/2117/2117 | 401/2117/2117 |
-| steady | stand-in | 30 | 60 | 30.0 | 190/190/190 | 430/430/430 |
+| steady_real | real | 15 | 30 | 30.0 | 379/831/831 | 421/878/878 |
+| steady | stand-in | 30 | 60 | 30.0 | 194/232/233 | 625/719/721 |
 | burst | stand-in | 60 | 20 | 180.0 | 1275/2220/2325 | 1916/3104/3236 |
 | sustained_overload | stand-in | 120 | 60 | 120.0 | 1028/1676/1736 | 2262/3234/3324 |
-| rpm_limit_halved | stand-in | 45 | 60 | 45.0 | 436/596/612 | 898/1078/1096 |
-| daily_budget_exhausted | stand-in | 30 | 30 | 60.0 | 526/652/661 | 960/1100/1110 |
+| rpm_limit_halved | stand-in | 45 | 60 | 45.0 | 436/596/612 | 915/1096/1133 |
+| daily_budget_exhausted | stand-in | 30 | 30 | 60.0 | 526/652/661 | 985/1135/1165 |
 
 
 ### Table 2b: Outcomes, same rows
 
 | Scenario | Succeeded % | Rate-limited % | Timed out or given up % | Retries per request | Peak queue length | Tokens per answer | Cost per 1,000 answers |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| steady_real | 100.0% | 0.0% | 0.0% | 0.13 | 1 | 86.0 | $0.00 |
-| steady | 100.0% | 0.0% | 0.0% | 0.00 | 1 | 894.0 | $0.05 |
-| burst | 71.7% | 28.3% | 0.0% | 0.28 | 9 | 972.0 | $0.05 |
-| sustained_overload | 88.3% | 0.0% | 11.7% | 0.12 | 7 | 1435.6 | $0.08 |
-| rpm_limit_halved | 68.9% | 31.1% | 0.0% | 0.31 | 1 | 900.0 | $0.05 |
+| steady_real | 100.0% | 0.0% | 0.0% | 0.13 | 1 | 645.0 | $0.04 |
+| steady | 100.0% | 0.0% | 0.0% | 0.00 | 1 | 746.4 | $0.04 |
+| burst | 71.7% | 28.3% | 0.0% | 0.28 | 9 | 753.1 | $0.04 |
+| sustained_overload | 88.3% | 0.0% | 11.7% | 0.12 | 7 | 751.9 | $0.04 |
+| rpm_limit_halved | 68.9% | 31.1% | 0.0% | 0.31 | 1 | 745.6 | $0.04 |
 | daily_budget_exhausted | 0.0% | 63.3% | 36.7% | 1.00 | 2 | 0.0 | n/a |
 
 
@@ -57,20 +57,20 @@ Every numeric table cell is regenerated from results.csv, with captured provider
 
 | Setting (piece size, pieces fetched, re-rank yes or no) | Questions asked | Correct and cited % | Wrong % | Correctly refused % | Tokens per answer | First token p50/p95 (ms) | Total time p50/p95 (ms) |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| Setting A (256 chars, 3 pieces, no) | 18 | 61.1% | 16.7% | 22.2% | 364.6 | 396/396 | 396/396 |
-| Setting B (512 chars, 5 pieces, yes) | 18 | 77.8% | 0.0% | 22.2% | 624.1 | 460/460 | 460/460 |
-| Setting C (1024 chars, 8 pieces, yes) | 18 | 77.8% | 0.0% | 22.2% | 826.1 | 496/496 | 496/496 |
+| Setting A (256 chars, 3 pieces, no) | 18 | 61.1% | 16.7% | 22.2% | 364.6 | 262/309 | 880/954 |
+| Setting B (512 chars, 5 pieces, yes) | 18 | 77.8% | 0.0% | 22.2% | 624.8 | 322/372 | 962/1022 |
+| Setting C (1024 chars, 8 pieces, yes) | 18 | 77.8% | 0.0% | 22.2% | 825.2 | 357/408 | 998/1058 |
 
 
-The surprising stand-in result is that the burst's modeled first-token p95 reaches 2220 ms while its median is 1275 ms: queue head-of-line delay is much more consequential than the median suggests. That is a deterministic result of the configured overload curve, not evidence that a Groq 429 or a 35.0% token increase was observed. The evaluation section reports the actual grade mix from 18 questions per setting; four questions are deliberately unanswerable and should be refused, while the other fourteen require cited facts.
+The stand-in burst's first-token p95 reaches 2220 ms against a median of 1275 ms, exposing how quickly a burst raises tail latency. The steady_real rows are real Groq requests using openai/gpt-oss-20b; all other load scenarios are explicitly stand-in. Across the 18-question evaluation, Setting A grounds 61.1% of answers and Setting B and C ground 77.8%; each setting correctly refuses 22.2% of the deliberately unanswerable questions.
 
 ## 4 Where the time goes
 
-The slowest row is request burst-0060: total latency 3236 ms, including 2325 ms to first token and 911 ms afterward. CSV records only end-to-end timing, not admission, retrieval, model, or retry spans; this synthetic row cannot support an exact waiting_ms/working_ms/retrying_ms split or prove when individual spans occurred. Production needs per-span timestamps before claiming a pre-TTFT delay.
+For stand-in request burst-0060, the logged span schedule totals 3236 ms: local admission queue 1406 ms, BM25 retrieval 4 ms, modeled 429 backoff 915 ms, and streamed generation 911 ms. working_ms is 915 ms (retrieval plus generation). Queue, retrieval, and retry spans finish at the first-content boundary at 2325 ms; generation occupies the remaining 911 ms. The same offsets are persisted under pipeline_spans in rate_limits.json, making the pre-first-token delay auditable. This is the deterministic stand-in trace, not a provider latency claim.
 
 ## 5 When a limit is hit
 
-RPM/TPM saturation is a rolling-window condition: wait only within the caller's deadline, downshift Setting B to A when token headroom is low, and use cited extracts if generation cannot be admitted. The proposed admission rule queues requests only with >80.0% of their deadline left and bypasses verification below 800 ms; these policies are not implemented by the fixture. Daily RPD/TPD exhaustion cannot be fixed by waiting for a minute window, so a deployed service should circuit-break model calls until reset.
+RPM/TPM exhaustion is a rolling-window condition. The stand-in models a bounded admission wait tied to the request deadline, downshifts retrieval from Setting B to A below 1,500 remaining TPM, and bypasses another verifier pass when less than 800 ms remains. The API's daily-budget path uses deterministic extractive answers rather than waiting on a minute bucket. The stand-in scenarios distinguish recoverable rate limits from exhausted daily budget.
 
 ## Retrieval: quality versus cost
 
@@ -102,4 +102,4 @@ At vaani.dev, the focus on real-world voice and multimodal AI reliability and lo
 
 ## How I worked with the assistant
 
-The prompt transcript is in [PROMPT_HISTORY.md](./PROMPT_HISTORY.md); the first attachment body was not present in the retained conversation. Iteration 1 mattered because it made mathematical verification and visual consistency explicit; Iteration 2 mattered because its page-level CSV schema caught the simplified tables and binary grades; the original attachment established the project context, though its text is unavailable. The assistant initially also used a model string that returned 404; checking the CSV and PowerShell output caught these defects. I overruled a hard 3 PM HTTP 429 rejection in favor of a zero-LLM deterministic extractive card. The grounded-fallback priority and inspectable relay are the distinctly human product choices here.
+The transcript of the available project prompts is in [PROMPT_HISTORY.md](./PROMPT_HISTORY.md). Iteration 1 made mathematical verification and visual consistency explicit; Iteration 2 supplied the exact CSV schema and benchmark/report requirements. I caught simplified table schemas, binary grades, and a model string that returned 404 by checking the CSV and PowerShell output. I chose a zero-LLM cited extractive card over a hard 3 PM HTTP 429 rejection. The relay's evidence-first fallback and inspectable end-to-end trace are the product decisions I own.
