@@ -24,9 +24,9 @@ Every numeric table cell is regenerated from results.csv, with captured provider
 | Tokens per minute | 6,000 TPM (or 12,000 TPM depending on active model header; observed 8000) | x-ratelimit-limit-tokens captured on real response | high |
 | Requests per day | 14,400 RPD (or 1,000 RPD on 70B) | Groq rate-limit documentation; remaining-requests observed 915 is a window counter, not a daily delta | high |
 | Tokens per day | 500,000 TPD (or 100,000 TPD on 70B) | Free-tier reference; remaining-tokens observed 7723 is a window counter, not a daily total | medium |
-	| Requests in flight at once | ~6 concurrent before queueing knee (assignment hypothesis; not provider-measured) | Stand-in concurrency fixture; the five-call real burst does not establish a provider knee | medium |
+| Requests in flight at once | ~6 concurrent before queueing knee (assignment hypothesis; not provider-measured) | Stand-in concurrency fixture; the five-call real burst does not establish a provider knee | medium |
 | What it returns when a limit is hit | HTTP 429 JSON error (rate_limit_exceeded) + retry-after header | API error contract; real burst probe: 0 of 5 real burst probes returned 429; retry-after: header not observed | high |
-	| Time until it recovers | 2.0s–12.5s reference for TPM/RPM window reset (not measured in this run) | x-ratelimit reset headers: tokens=2.077s, requests=2h2m24s; cooldown to HTTP 200: header reset tokens=2.077s, requests=2h2m24s; post-429 recovery not measured | high |
+| Time until it recovers | 2.0s–12.5s reference for TPM/RPM window reset (not measured in this run) | x-ratelimit reset headers: tokens=2.077s, requests=2h2m24s; cooldown to HTTP 200: header reset tokens=2.077s, requests=2h2m24s; post-429 recovery not measured | high |
 
 
 ### Table 2a: Latency, one row per load scenario
