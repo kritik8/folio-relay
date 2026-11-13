@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#FAF7F2">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <title>FolioRelay. — A little latency goes a long way</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -115,6 +116,15 @@
     .orbit-dot.dot-one { top: 26px; right: 24px; }
     .orbit-dot.dot-two { left: 36px; bottom: 31px; width: 5px; height: 5px; }
     .signal-label { position: absolute; right: 14px; bottom: 12px; color: #66594E; font: 400 9px "JetBrains Mono", monospace; letter-spacing: .19em; }
+    .research-diagram { display: block; width: min(100%, 560px); height: auto; }
+    .diagram-flow { fill: none; stroke: var(--accent-sienna); stroke-width: 1.5; }
+    .diagram-paper { fill: var(--bg-cream); stroke: rgba(92,73,56,.48); stroke-width: 1; }
+    .diagram-paper-mark { stroke: var(--number-muted); stroke-width: 2; }
+    .diagram-relay { fill: #5C4938; }
+    .diagram-answer { fill: var(--bg-cream); stroke: var(--accent-sienna); stroke-width: 1; }
+    .diagram-label { fill: #66594E; font: 9px "JetBrains Mono", monospace; letter-spacing: .08em; }
+    .diagram-node-label { fill: var(--text-espresso); font: 9px "JetBrains Mono", monospace; letter-spacing: .04em; }
+    .diagram-relay-label { fill: var(--bg-cream); font: 9px "JetBrains Mono", monospace; letter-spacing: .08em; }
     .file-caption { padding: 19px 2px 2px; }
     .file-caption .kicker { color: var(--text-muted); font-size: 9px; }
     .file-caption h2 { margin: 9px 0 0; font: 400 25px/1.25 "Playfair Display", serif; letter-spacing: -.025em; }
@@ -135,7 +145,7 @@
     .paper-meta { border-top: 1px solid var(--border-hairline); padding-top: 12px; color: var(--text-muted); font: 400 10px/1.6 "JetBrains Mono", monospace; }
 
     .console-section { background: rgba(239,236,230,.38); }
-    .console-intro { max-width: 620px; color: var(--text-muted); margin: 12px 0 28px; font-size: 13px; }
+    .console-intro { max-width: 900px; color: var(--text-muted); margin: 12px 0 28px; font-size: 13px; line-height: 1.7; }
     .console { border-top: 1px solid var(--border-hairline); border-bottom: 1px solid var(--border-hairline); padding: 20px 0 24px; }
     .presets { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 17px; }
     .preset {
@@ -163,7 +173,8 @@
     .trace-step { padding: 12px 10px 12px 0; color: var(--text-muted); font-size: 11px; }
     .trace-step + .trace-step { padding-left: 12px; border-left: 1px solid var(--border-hairline); }
     .trace-step b { display: block; margin-top: 3px; color: var(--text-espresso); font-weight: 500; }
-    .trace-step.is-active b { color: var(--accent-sienna); }
+    .trace-step em { display: block; margin-top: 3px; font-style: normal; font-size: 10px; line-height: 1.4; color: var(--text-muted); }
+    .trace-step.is-active b, .trace-step.is-active em { color: var(--accent-sienna); }
     .trace-metrics { display: flex; flex-wrap: wrap; gap: 25px; }
     .trace-metric { min-width: 115px; }
     .trace-metric span { display: block; color: var(--text-muted); font-size: 9px; letter-spacing: .13em; text-transform: uppercase; }
@@ -250,21 +261,34 @@
           <div class="eyebrow">A little latency goes a long way</div>
           <h1>The relay is more resilient than you <em style="color:#A66A43;font-style:italic;">think.</em></h1>
         </div>
-        <article class="feature-file" aria-label="The Curious File, No. 01">
+        <article class="feature-file" aria-label="The Evidence File, No. 01">
           <div class="file-heading">
-            <span class="kicker">The Curious File</span>
+            <span class="kicker">The Evidence File</span>
             <em>No. 01</em>
           </div>
-          <div class="signal-canvas" aria-label="Signal diagram with three rings and two orbiting nodes">
-            <div class="signal-map" aria-hidden="true">
-              <span class="ring ring-one"></span>
-              <span class="ring ring-two"></span>
-              <span class="ring ring-three"></span>
-              <span class="orbit-dot dot-one"></span>
-              <span class="orbit-dot dot-two"></span>
-              <span class="signal-core">Wi<small>RL</small></span>
-            </div>
-            <span class="signal-label">SIGNAL</span>
+          <div class="signal-canvas">
+            <svg class="research-diagram" viewBox="0 0 600 320" role="img" aria-labelledby="researchDiagramTitle researchDiagramDescription">
+              <title id="researchDiagramTitle">Research evidence flow</title>
+              <desc id="researchDiagramDescription">Three research papers feed evidence into a relay, which produces a cited answer.</desc>
+              <path class="diagram-flow" d="M157 79 H211 L246 145 M157 160 H246 M157 241 H211 L246 175 M378 160 H438"/>
+              <rect class="diagram-paper" x="65" y="55" width="92" height="48"/>
+              <path class="diagram-paper-mark" d="M78 69 H142 M78 78 H131 M78 87 H137"/>
+              <text class="diagram-node-label" x="77" y="98">PAPER 01</text>
+              <rect class="diagram-paper" x="65" y="136" width="92" height="48"/>
+              <path class="diagram-paper-mark" d="M78 150 H142 M78 159 H131 M78 168 H137"/>
+              <text class="diagram-node-label" x="77" y="179">PAPER 02</text>
+              <rect class="diagram-paper" x="65" y="217" width="92" height="48"/>
+              <path class="diagram-paper-mark" d="M78 231 H142 M78 240 H131 M78 249 H137"/>
+              <text class="diagram-node-label" x="77" y="260">PAPER 03</text>
+              <rect class="diagram-relay" x="246" y="123" width="132" height="74"/>
+              <text class="diagram-relay-label" x="312" y="154" text-anchor="middle">EVIDENCE</text>
+              <text class="diagram-relay-label" x="312" y="170" text-anchor="middle">SYNTHESIS</text>
+              <rect class="diagram-answer" x="438" y="137" width="100" height="46"/>
+              <path class="diagram-paper-mark" d="M451 150 H525 M451 159 H516"/>
+              <text class="diagram-node-label" x="451" y="176">CITED ANSWER</text>
+              <text class="diagram-label" x="65" y="293">ARXIV SOURCES</text>
+              <text class="diagram-label" x="438" y="205">VERIFIED OUTPUT</text>
+            </svg>
           </div>
           <div class="file-caption">
             <div class="kicker">Inference · 5 step pipeline</div>
@@ -337,11 +361,11 @@
           <div class="trace-area" aria-live="polite">
             <div class="mini-label trace-label">The five-step relay</div>
             <div class="trace-steps" id="traceSteps">
-              <div class="trace-step"><span>01</span><b>Intent</b></div>
-              <div class="trace-step"><span>02</span><b>ArXiv fetch</b></div>
-              <div class="trace-step"><span>03</span><b>Sufficiency router</b></div>
-              <div class="trace-step"><span>04</span><b>Cited answer</b></div>
-              <div class="trace-step"><span>05</span><b>Verifier</b></div>
+              <div class="trace-step"><span>01</span><b>Intent</b><em data-step-status>idle</em></div>
+              <div class="trace-step"><span>02</span><b>ArXiv fetch</b><em data-step-status>idle</em></div>
+              <div class="trace-step"><span>03</span><b>Sufficiency router</b><em data-step-status>idle</em></div>
+              <div class="trace-step"><span>04</span><b>Cited answer</b><em data-step-status>idle</em></div>
+              <div class="trace-step"><span>05</span><b>Verifier</b><em data-step-status>idle</em></div>
             </div>
             <div class="trace-metrics">
               <div class="trace-metric"><span>Waiting</span><strong id="waitingMs">— ms</strong></div>
@@ -534,26 +558,56 @@
       });
     });
 
+    const stepNodes = [...document.querySelectorAll('.trace-step')];
+    const resetSteps = () => stepNodes.forEach(step => {
+      const status = step.querySelector('[data-step-status]');
+      if (status) status.textContent = 'idle';
+    });
+    const renderSteps = steps => {
+      if (!Array.isArray(steps)) return;
+      stepNodes.forEach((step, index) => {
+        const status = step.querySelector('[data-step-status]');
+        const info = steps[index];
+        if (!status || !info) return;
+        const timing = Number(info.time_ms) > 0 ? ` · ${Math.round(Number(info.time_ms))} ms` : '';
+        status.textContent = `${info.status || 'ok'}${timing}`;
+      });
+    };
+
     document.getElementById('queryForm').addEventListener('submit', async event => {
       event.preventDefault();
       const button = document.getElementById('askButton');
       const panel = document.getElementById('answerPanel');
       document.getElementById('fallbackPanel').hidden = true;
-      const steps = [...document.querySelectorAll('.trace-step')];
       button.disabled = true;
       button.textContent = 'Following the relay…';
       panel.hidden = true;
-      steps.forEach(step => step.classList.add('is-active'));
+      resetSteps();
+      stepNodes.forEach(step => step.classList.add('is-active'));
       try {
-        const formData = new FormData(event.currentTarget);
-        const response = await fetch('/api/query', { method: 'POST', body: formData });
+        const payload = {
+          question: document.getElementById('questionInput').value,
+          setting: document.getElementById('retrievalSetting').value,
+          mode: document.getElementById('sourceMode').value
+        };
+        const response = await fetch('/api/query', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || `Query returned ${response.status}`);
-        document.getElementById('waitingMs').textContent = formatLatency(data.trace.waiting_ms);
-        document.getElementById('workingMs').textContent = formatLatency(data.trace.working_ms);
-        document.getElementById('retryingMs').textContent = formatLatency(data.trace.retrying_ms);
-        document.getElementById('outputTokens').textContent = String((data.answer || '').trim().split(/\s+/).filter(Boolean).length);
-        document.getElementById('answerStatus').textContent = `${data.setting.name || data.setting.Name} · VERIFIED RESPONSE`;
+        const trace = data.trace || {};
+        document.getElementById('waitingMs').textContent = formatLatency(trace.waiting_ms);
+        document.getElementById('workingMs').textContent = formatLatency(trace.working_ms);
+        document.getElementById('retryingMs').textContent = formatLatency(trace.retrying_ms);
+        const outputTokens = trace.tokens_out || (data.answer || '').trim().split(/\s+/).filter(Boolean).length;
+        document.getElementById('outputTokens').textContent = String(outputTokens);
+        renderSteps(data.steps);
+        const settingLabel = typeof data.setting === 'string'
+          ? data.setting
+          : (data.setting && (data.setting.name || data.setting.Name)) || 'Setting';
+        document.getElementById('answerStatus').textContent = `${settingLabel} · VERIFIED RESPONSE`;
         document.getElementById('answerText').textContent = data.answer;
         panel.hidden = false;
       } catch (error) {
@@ -563,7 +617,7 @@
       } finally {
         button.disabled = false;
         button.textContent = 'Ask the relay';
-        steps.forEach(step => step.classList.remove('is-active'));
+        stepNodes.forEach(step => step.classList.remove('is-active'));
       }
     });
 
@@ -575,7 +629,11 @@
           const response = await fetch('/api/simulate', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ scenario: button.dataset.scenario, count: 18 })
+            body: JSON.stringify({
+              scenario: button.dataset.scenario,
+              count: 18,
+              question: document.getElementById('questionInput').value
+            })
           });
           const result = await response.json();
           if (!response.ok) throw new Error(result.error || `Simulation returned ${response.status}`);

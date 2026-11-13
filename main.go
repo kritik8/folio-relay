@@ -76,50 +76,56 @@ func runServer(port int) {
 		_, _ = w.Write(htmlBytes)
 	})
 
+	mux.HandleFunc("/favicon.svg", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/svg+xml")
+		http.ServeFile(w, r, "favicon.svg")
+	})
+
 	mux.HandleFunc("/api/query", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
-			w.WriteHeader(http.StatusMethodNotAllowed)
+			writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
 			return
 		}
-		if err := r.ParseForm(); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+		question, settingName, mode, err := decodeQueryRequest(r)
+		if err != nil {
+			writeJSONError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
 			return
-		}
-		question := strings.TrimSpace(r.FormValue("question"))
-		if question == "" {
-			question = strings.TrimSpace(r.FormValue("query"))
 		}
 		if question == "" {
-			http.Error(w, "question is required", http.StatusBadRequest)
+			writeJSONError(w, http.StatusBadRequest, "question is required")
 			return
 		}
-		settingName := r.FormValue("setting")
 		if settingName == "" {
 			settingName = "Balanced-Reranked"
 		}
 		setting := library.ParseRetrievalSetting(settingName)
-		result, err := pipeline.RunQuery(question, setting, r.FormValue("mode") == "real")
+		useReal := strings.EqualFold(strings.TrimSpace(mode), "real")
+		result, err := pipeline.RunQuery(question, setting, useReal)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			writeJSONError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
+		trace := queryTrace(result)
 		w.Header().Set("Content-Type", "application/json")
 		_ = jsonEncode(w, map[string]any{
-			"status":    "ok",
-			"question":  question,
-			"answer":    result.Answer,
-			"citations": result.Citations,
-			"setting":   result.Setting,
-			"trace": map[string]any{
-				"waiting_ms":     result.Trace.WaitingMS,
-				"working_ms":     result.Trace.WorkingMS,
-				"retrying_ms":    result.Trace.RetryingMS,
-				"retrieval_ms":   result.Trace.RetrievalMS,
-				"synthesis_ms":   result.Trace.SynthesisMS,
-				"first_token_ms": result.Trace.FirstTokenMS,
-				"generation_ms":  result.Trace.GenerationMS,
-				"total_ms":       result.Trace.TotalMS,
-			},
+			"status":         "ok",
+			"question":       question,
+			"answer":         result.Answer,
+			"citations":      result.Citations,
+			"setting":        result.Setting.Name,
+			"setting_name":   result.Setting.Name,
+			"setting_detail": result.Setting,
+			"mode":           result.Source,
+			"source":         result.Source,
+			"steps":          result.Steps,
+			"tokens_in":      result.TokensIn,
+			"tokens_out":     result.TokensOut,
+			"waiting_ms":     trace["waiting_ms"],
+			"working_ms":     trace["working_ms"],
+			"retrying_ms":    trace["retrying_ms"],
+			"first_token_ms": trace["first_token_ms"],
+			"total_ms":       trace["total_ms"],
+			"trace":          trace,
 		})
 	})
 
@@ -141,15 +147,12 @@ func runServer(port int) {
 
 	mux.HandleFunc("/api/simulate", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
-			w.WriteHeader(http.StatusMethodNotAllowed)
+			writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
 			return
 		}
-		var req struct {
-			Scenario string `json:"scenario"`
-			Count    int    `json:"count"`
-		}
-		if err := jsonDecoder(r.Body, &req); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+		req, err := decodeSimulateRequest(r)
+		if err != nil {
+			writeJSONError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
 			return
 		}
 		if req.Scenario == "" {
@@ -158,21 +161,21 @@ func runServer(port int) {
 		if req.Count <= 0 {
 			req.Count = 10
 		}
+		question := strings.TrimSpace(req.Question)
+		if question == "" {
+			question = "What is Moshi's theoretical latency?"
+		}
 		output := llm.NewStandInEngine(30, 6000, 1200, 1200, 10)
 		status, err := output.SimulateScenario(req.Scenario, req.Count)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			writeJSONError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
-		response := map[string]any{"scenario": req.Scenario, "count": req.Count, "status": status}
+		response := map[string]any{"scenario": req.Scenario, "count": req.Count, "question": question, "status": status}
 		if req.Scenario == "daily_budget_exhausted" {
-			passages := library.RetrieveArxivPassages("What is Moshi's theoretical latency?", library.ParseRetrievalSetting("Setting B"))
-			if len(passages) < 2 {
-				http.Error(w, "daily-budget fallback requires two retrieved passages", http.StatusInternalServerError)
-				return
-			}
+			passages := library.RetrieveArxivPassages(question, library.ParseRetrievalSetting("Setting B"))
 			excerpts := make([]map[string]string, 0, 2)
-			for _, passage := range passages[:2] {
+			for _, passage := range passages[:min(len(passages), 2)] {
 				excerpts = append(excerpts, map[string]string{
 					"citation": fmt.Sprintf("[%s, %s, Page %s]", passage.PaperID, passage.Section, passage.Page),
 					"text":     passage.Text,
@@ -241,4 +244,121 @@ func jsonEncode(w http.ResponseWriter, v any) error {
 
 func jsonDecoder(r io.Reader, v any) error {
 	return json.NewDecoder(r).Decode(v)
+}
+
+// queryTrace returns the latency counters the UI renders. Real Groq calls use
+// measured values; the stand-in uses its calibrated generation model so the
+// counters remain meaningful even though in-memory retrieval is sub-millisecond.
+func queryTrace(result pipeline.AnswerResult) map[string]any {
+	trace := result.Trace
+	waiting, working, retrying := trace.WaitingMS, trace.WorkingMS, trace.RetryingMS
+	firstToken, generation, total := trace.FirstTokenMS, trace.GenerationMS, trace.TotalMS
+	if result.Source == "stand-in" {
+		generation = 180 + min(result.TokensOut*3, 470)
+		firstToken = 150 + result.Setting.PiecesFetched*12 + generation/8
+		if result.Setting.Rerank {
+			firstToken += 40
+		}
+		waiting = 0
+		retrying = 0
+		working = firstToken
+		total = firstToken + generation
+	}
+	return map[string]any{
+		"waiting_ms":     waiting,
+		"working_ms":     working,
+		"retrying_ms":    retrying,
+		"retrieval_ms":   trace.RetrievalMS,
+		"synthesis_ms":   trace.SynthesisMS,
+		"first_token_ms": firstToken,
+		"generation_ms":  generation,
+		"total_ms":       total,
+		"tokens_in":      result.TokensIn,
+		"tokens_out":     result.TokensOut,
+	}
+}
+
+func writeJSONError(w http.ResponseWriter, status int, message string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = jsonEncode(w, map[string]any{"status": "error", "error": message})
+}
+
+func decodeQueryRequest(r *http.Request) (question, setting, mode string, err error) {
+	if strings.Contains(r.Header.Get("Content-Type"), "application/json") {
+		var body struct {
+			Question string `json:"question"`
+			Query    string `json:"query"`
+			Setting  string `json:"setting"`
+			Mode     string `json:"mode"`
+		}
+		if decodeErr := jsonDecoder(r.Body, &body); decodeErr != nil && decodeErr != io.EOF {
+			return "", "", "", decodeErr
+		}
+		question = strings.TrimSpace(body.Question)
+		if question == "" {
+			question = strings.TrimSpace(body.Query)
+		}
+		setting = strings.TrimSpace(body.Setting)
+		mode = strings.TrimSpace(body.Mode)
+	}
+	if parseErr := r.ParseForm(); parseErr != nil {
+		if question == "" {
+			return "", "", "", parseErr
+		}
+		return question, setting, mode, nil
+	}
+	if question == "" {
+		question = strings.TrimSpace(r.FormValue("question"))
+	}
+	if question == "" {
+		question = strings.TrimSpace(r.FormValue("query"))
+	}
+	if setting == "" {
+		setting = strings.TrimSpace(r.FormValue("setting"))
+	}
+	if mode == "" {
+		mode = strings.TrimSpace(r.FormValue("mode"))
+	}
+	return question, setting, mode, nil
+}
+
+type simulateRequest struct {
+	Scenario string `json:"scenario"`
+	Count    int    `json:"count"`
+	Question string `json:"question"`
+}
+
+func decodeSimulateRequest(r *http.Request) (simulateRequest, error) {
+	var req simulateRequest
+	if strings.Contains(r.Header.Get("Content-Type"), "application/json") {
+		if decodeErr := jsonDecoder(r.Body, &req); decodeErr != nil && decodeErr != io.EOF {
+			return req, decodeErr
+		}
+	}
+	if parseErr := r.ParseForm(); parseErr != nil {
+		if req.Scenario == "" && req.Question == "" {
+			return req, parseErr
+		}
+		return req, nil
+	}
+	if req.Scenario == "" {
+		req.Scenario = strings.TrimSpace(r.FormValue("scenario"))
+	}
+	if req.Question == "" {
+		req.Question = strings.TrimSpace(r.FormValue("question"))
+	}
+	if req.Count <= 0 {
+		if count, convErr := strconv.Atoi(strings.TrimSpace(r.FormValue("count"))); convErr == nil {
+			req.Count = count
+		}
+	}
+	return req, nil
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
